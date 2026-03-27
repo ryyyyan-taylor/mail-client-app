@@ -126,6 +126,26 @@ Compose Navigation wired in Section 8.
   @media queries; JS strips HTML `width` attrs to trigger mobile layouts.
 - Next: Section 6 (thread actions — swipe gestures, archive/delete/spam/move).
 
+### 2026-03-27 (session 2)
+- Section 6 (partial): swipe actions on InboxScreen.
+  - Swipe left → delete with undo snackbar (diverged from plan: was archive).
+  - Swipe right → LabelPickerSheet (ModalBottomSheet listing user labels), applies label
+    and removes INBOX, with undo snackbar.
+  - Optimistic hide via `_hiddenIds: MutableStateFlow<Set<String>>` combined with
+    observeInbox(); rollback on API failure.
+  - New InboxViewModel methods: hideThread, unhideThread, confirmDelete, confirmMove,
+    loadLabels (syncs on init, loads into availableLabels state).
+  - SwipeableThreadItem composable wraps SwipeToDismissBox; confirmValueChange returns
+    false for StartToEnd (right swipe) so item snaps back after showing the sheet.
+  - Labels filtered to type=="user" in LabelPickerSheet.
+- Added 12px horizontal body padding to HTML emails (CSS `padding: 0 12px` on body).
+- Added screen transition animations (MainActivity): AnimatedContent with slide+fade;
+  NavScreen sealed class embeds threadId in state so exit animation doesn't null-crash.
+- Added message expand/collapse animations (ThreadDetailScreen): animateContentSize()
+  on MessageCard Column + AnimatedVisibility fade for body/snippet.
+  - animateContentSize import is androidx.compose.animation (not foundation.layout).
+- Next: remaining Section 6 items (action bar/bottom sheet, batch select), then Section 7.
+
 ---
 
 ## How to Update This File

@@ -4,12 +4,17 @@ import android.view.MotionEvent
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -144,7 +149,8 @@ private fun MessageCard(message: MessageEntity, initiallyExpanded: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Black),
+            .background(Black)
+            .animateContentSize(),
     ) {
         Row(
             modifier = Modifier
@@ -170,14 +176,24 @@ private fun MessageCard(message: MessageEntity, initiallyExpanded: Boolean) {
             )
         }
 
-        if (expanded) {
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(160)),
+        ) {
             HtmlBody(
                 html = buildHtml(message.body),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp),
             )
-        } else {
+        }
+
+        AnimatedVisibility(
+            visible = !expanded,
+            enter = fadeIn(tween(220)),
+            exit = fadeOut(tween(160)),
+        ) {
             Text(
                 text = message.snippet,
                 color = TextDisabled,
@@ -273,7 +289,7 @@ html, body {
     font-size: 14px;
     line-height: 1.6;
     margin: 0;
-    padding: 0;
+    padding: 0 12px;
     word-wrap: break-word;
     overflow-wrap: break-word;
 }

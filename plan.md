@@ -178,13 +178,13 @@ Add actions for managing threads: archive, delete, spam, move, and read state.
   - **Spam** — add SPAM label, remove INBOX
   - **Mark unread** — add UNREAD label
   - **Move to** — show label picker, add/remove labels
-- [ ] Swipe gestures on inbox list items:
-  - Swipe right → archive (with undo snackbar)
+- [x] Swipe gestures on inbox list items (changed from plan):
   - Swipe left → delete (with undo snackbar)
-- [ ] Implement optimistic updates (update Room immediately, sync to API, rollback on failure)
+  - Swipe right → move-to-label bottom sheet (applies label, removes INBOX, with undo snackbar)
+- [x] Implement optimistic updates (_hiddenIds filter in ViewModel, rollback on API failure)
 - [ ] Batch actions: long-press to select multiple threads, apply action to all
-- [ ] Undo snackbar for destructive actions (3-second window before API call fires)
-- [ ] Update inbox list after actions (thread disappears on archive/delete/spam)
+- [x] Undo snackbar for destructive actions (snackbar awaits result before firing API)
+- [x] Update inbox list after actions (thread disappears immediately, restored on undo)
 
 **Deliverable:** All thread management actions work with undo support and optimistic UI.
 
