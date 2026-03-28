@@ -8,12 +8,11 @@ start of every session. Update it at the end of every session (see instructions 
 ## Project Summary
 
 A Gmail-only Android email client. Dark-themed, serverless (no backend), periodic
-polling for new mail. MVP scope: inbox, thread view, actions (archive/delete/spam/move/
-mark read). No compose or reply.
+background polling for new mail. MVP is complete and feature work continues in `plan.md`.
 
 **Package:** `com.mail.client`
 **Working directory:** `/home/rt/Code/mail-client-app/android`
-**Plan:** `plan.md` in the repo root — sections track progress with ✅
+**Plan:** `plan.md` in the repo root
 
 ---
 
@@ -27,7 +26,7 @@ mark read). No compose or reply.
 | Database | Room 2.7.0 | KSP codegen |
 | Network | Retrofit 2.11.0 + OkHttp 4.12.0 + Moshi 1.15.1 | KotlinJsonAdapterFactory (reflection) |
 | Auth | Google Sign-In (GoogleSignIn + GoogleAuthUtil) | EncryptedSharedPreferences for tokens |
-| Background | WorkManager 2.10.0 | Section 7 — not yet implemented |
+| Background | WorkManager 2.10.0 | Periodic sync, UPDATE policy for interval changes |
 | Build | AGP 8.9.1 | **Do not upgrade** — AGP 9.x breaks KSP/Koin |
 
 **KSP version:** `2.2.21-2.0.5` — must match Kotlin version exactly.
@@ -50,21 +49,22 @@ mark read). No compose or reply.
 ```
 com.mail.client/
 ├── data/
-│   ├── local/          # Room: Entities, DAOs, MailDatabase
+│   ├── local/          # Room: Entities, DAOs, MailDatabase, SettingsPrefs
 │   ├── remote/         # Retrofit: GmailApiService, DTOs, AuthInterceptor, RetrofitProvider
 │   └── repository/     # MailRepository (single source of truth), AuthRepository
 ├── di/                 # AppModule (Koin)
 ├── ui/
 │   ├── theme/          # Color.kt, Theme.kt, Type.kt
 │   ├── auth/           # SignInViewModel, SignInScreen
-│   ├── inbox/          # InboxViewModel, InboxScreen (ThreadListItem)
-│   └── thread/         # ThreadDetailViewModel, ThreadDetailScreen (MessageCard, HtmlBody)
+│   ├── inbox/          # InboxViewModel, InboxScreen
+│   ├── thread/         # ThreadDetailViewModel, ThreadDetailScreen
+│   └── settings/       # SettingsViewModel, SettingsSheet
 ├── util/               # EmailParser, TimeFormatter
-└── worker/             # (Section 7 — not yet built)
+└── worker/             # SyncWorker
 ```
 
-**Navigation:** Currently simple `var openThreadId` state in `MainActivity`. Full
-Compose Navigation wired in Section 8.
+**Navigation:** `sealed class NavScreen` with `mutableStateOf` in `MainActivity`. No
+Compose Navigation — the current approach is sufficient for the screen count.
 
 ---
 
@@ -74,7 +74,7 @@ Compose Navigation wired in Section 8.
 |---|---|---|
 | Black | `#000000` | App background, list rows |
 | SurfaceDark | `#111111` | Cards, elevated surfaces |
-| SurfaceVariant | `#1A1A1A` | |
+| SurfaceVariant | `#1A1A1A` | Selected row background |
 | Divider | `#2A2A2A` | Row dividers |
 | TextPrimary | `#E8E8E8` | Main text |
 | TextSecondary | `#888888` | Timestamps, secondary labels |
@@ -105,46 +105,63 @@ Compose Navigation wired in Section 8.
 - Opening a thread uses `format=full` (full message bodies).
 - Labels stored as comma-separated strings in Room (e.g. `"INBOX,UNREAD"`).
 - Token refresh: `AuthInterceptor` catches 401, invalidates token, retries once.
+- `syncLabels()` is throttled to once per hour (in-memory timestamp guard in `MailRepository`).
 
-### Inbox layout
-- Single-line rows: unread dot · sender (fixed 110dp) · subject (weighted, ellipsed
-  before the date) · timestamp (intrinsic width).
+### Inbox
+- Single-line rows: unread dot · sender (fixed 110dp) · subject (weighted, ellipsed) · timestamp.
+- Swipe left → delete (undo snackbar). Swipe right → move-to-label sheet.
+- Long-press → batch selection mode. `BackHandler` exits it.
+- Optimistic hide: `_hiddenIds: MutableStateFlow<Set<String>>` filtered in `observeInbox()`;
+  rolled back on API failure or undo.
+
+### Thread actions
+- Bottom-right vertical pill: Move, Delete, MoreVert (Spam, Mark read/unread).
+- Pill hidden via `AnimatedVisibility` while thread is loading.
+- Actions that remove the thread from inbox set `navigateBack = true` in state,
+  triggering `onBack()` via `LaunchedEffect`.
+
+### Settings
+- `SettingsPrefs` wraps `SharedPreferences` — sync interval + notifications enabled.
+- `MailClientApp.scheduleSyncWorker()` reads interval from prefs on each start;
+  uses `ExistingPeriodicWorkPolicy.UPDATE` so changes apply at the next run.
+- `SyncWorker` checks `authRepository.isSignedIn()` before running, and
+  `settingsPrefs.notificationsEnabled` before firing notifications.
 
 ---
 
 ## Session Notes
 
-### 2026-03-27
-- Completed Section 4: InboxViewModel, InboxScreen, single-line ThreadListItem.
-- Completed Section 5: ThreadDetailViewModel, ThreadDetailScreen with collapsible
-  MessageCard and WebView-based HtmlBody.
-- Fixed WebView height bug (CSS px ≠ physical px — do not use density conversion).
-- Fixed scroll conflict (LazyColumn + WebView touch interception).
-- Fixed ViewModel reuse bug (added `key = threadId` to koinViewModel).
-- Fixed WebView reload loop (webView.tag guard in AndroidView update block).
-- HTML emails: white background; preserve email's own `<style>` blocks for responsive
-  @media queries; JS strips HTML `width` attrs to trigger mobile layouts.
-- Next: Section 6 (thread actions — swipe gestures, archive/delete/spam/move).
+### 2026-03-28
+- MVP complete. All 8 sections shipped.
+- Settings (SettingsSheet + SettingsViewModel), splash screen, SyncWorker auth/pref
+  guards, syncLabels throttle, visual bug fixes (CircularProgressIndicator modifier,
+  SelectionPill padding, ThreadActionsPill AnimatedVisibility).
+- Moved Settings out of top bar into MoreVert overflow; removed redundant refresh icon
+  (pull-to-refresh covers it).
 
-### 2026-03-27 (session 2)
-- Section 6 (partial): swipe actions on InboxScreen.
-  - Swipe left → delete with undo snackbar (diverged from plan: was archive).
-  - Swipe right → LabelPickerSheet (ModalBottomSheet listing user labels), applies label
-    and removes INBOX, with undo snackbar.
-  - Optimistic hide via `_hiddenIds: MutableStateFlow<Set<String>>` combined with
-    observeInbox(); rollback on API failure.
-  - New InboxViewModel methods: hideThread, unhideThread, confirmDelete, confirmMove,
-    loadLabels (syncs on init, loads into availableLabels state).
-  - SwipeableThreadItem composable wraps SwipeToDismissBox; confirmValueChange returns
-    false for StartToEnd (right swipe) so item snaps back after showing the sheet.
-  - Labels filtered to type=="user" in LabelPickerSheet.
-- Added 12px horizontal body padding to HTML emails (CSS `padding: 0 12px` on body).
-- Added screen transition animations (MainActivity): AnimatedContent with slide+fade;
-  NavScreen sealed class embeds threadId in state so exit animation doesn't null-crash.
-- Added message expand/collapse animations (ThreadDetailScreen): animateContentSize()
-  on MessageCard Column + AnimatedVisibility fade for body/snippet.
-  - animateContentSize import is androidx.compose.animation (not foundation.layout).
-- Next: remaining Section 6 items (action bar/bottom sheet, batch select), then Section 7.
+### 2026-03-28 (session 2)
+- Landscape two-pane layout: persistent 50/50 split with scroll-hiding top bar.
+  - `LocalConfiguration.current.orientation` detection in both `InboxScreen` and `MainActivity`.
+  - `TopAppBarDefaults.enterAlwaysScrollBehavior()` + `nestedScroll` in landscape only.
+  - `InboxListContent` private composable extracted so list renders in both orientations.
+  - Right pane: `key(selectedThreadId) { ThreadDetailScreen(contentOnly=true) }` or
+    "select a thread" placeholder.
+  - `contentOnly: Boolean = false` param on `ThreadDetailScreen` — skips Scaffold/TopAppBar,
+    renders `Box(Black)` with SnackbarHost at BottomStart + action pill at BottomEnd.
+  - `initialSelectedThreadId: String?` param on `InboxScreen` + `LaunchedEffect` sync
+    so notification taps route correctly in landscape without going through `NavScreen.Thread`.
+  - `MainActivity`: `openThreadId != null && !isLandscape` guards `NavScreen.Thread`;
+    landscape passes `initialSelectedThreadId = openThreadId` to `InboxScreen` instead.
+- Section/label navigation: tap inbox title → bottom sheet (system sections + user labels).
+  - Fixed filter bug: `it.type != "system"` (was `== "user"`, dropped blank-type labels).
+  - Fixed scroll bug: SectionPickerSheet uses `LazyColumn` (was `Column`).
+  - Fixed Moshi crash: `LabelDto.name: String?` (was non-nullable, threw on labels
+    without `name` field, silently swallowed, stale cache used).
+  - Fixed throttle: `syncLabels(force=true)` called via `refreshLabels()` when picker opens.
+- Dark splash screen: `themes.xml` switched from `Theme.Material.Light.NoActionBar` to
+  `Theme.Material.NoActionBar` with `windowBackground/statusBarColor/navigationBarColor = #000`.
+  Eliminates white flash before Compose renders.
+- Next: real device testing, then iterate on features from plan.md.
 
 ---
 
@@ -156,7 +173,7 @@ At the end of every session, append a new entry under **Session Notes** with:
 - Any new constraints or gotchas discovered
 - What comes next
 
-Also update `plan.md` to mark completed items with `✅` or `[x]`.
+Also update `plan.md` (tick off completed items, add new feature ideas as they come up).
 
 Update global memory files in `/home/rt/.claude/projects/-home-rt-Code-mail-client-app/memory/`
 if anything changes about the user's preferences, project goals, or key decisions.

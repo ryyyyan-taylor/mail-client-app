@@ -13,6 +13,9 @@ interface ThreadDao {
     @Query("SELECT * FROM threads WHERE labelIds LIKE '%INBOX%' ORDER BY lastMessageTimestamp DESC")
     fun observeInbox(): Flow<List<ThreadEntity>>
 
+    @Query("SELECT * FROM threads WHERE labelIds LIKE :pattern ORDER BY lastMessageTimestamp DESC")
+    fun observeForLabel(pattern: String): Flow<List<ThreadEntity>>
+
     @Query("SELECT * FROM threads WHERE id = :id")
     suspend fun getById(id: String): ThreadEntity?
 
@@ -24,4 +27,7 @@ interface ThreadDao {
 
     @Query("SELECT MAX(lastMessageTimestamp) FROM threads")
     suspend fun getLatestTimestamp(): Long?
+
+    @Query("SELECT id FROM threads WHERE labelIds LIKE '%INBOX%'")
+    suspend fun getInboxIds(): List<String>
 }

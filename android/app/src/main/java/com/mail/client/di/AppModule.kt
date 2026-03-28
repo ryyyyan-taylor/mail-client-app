@@ -1,12 +1,14 @@
 package com.mail.client.di
 
 import com.mail.client.data.local.MailDatabase
+import com.mail.client.data.local.SettingsPrefs
 import com.mail.client.data.remote.RetrofitProvider
 import com.mail.client.data.repository.AuthRepository
 import com.mail.client.data.repository.MailRepository
 import com.mail.client.data.local.TokenStorage
 import com.mail.client.ui.auth.SignInViewModel
 import com.mail.client.ui.inbox.InboxViewModel
+import com.mail.client.ui.settings.SettingsViewModel
 import com.mail.client.ui.thread.ThreadDetailViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.viewmodel.dsl.viewModel
@@ -30,6 +32,10 @@ val appModule = module {
 
     // ── Repository ────────────────────────────────────────────────────────────
     single { MailRepository(get(), get(), get(), get()) }
+
+    // ── Settings ──────────────────────────────────────────────────────────────
+    single { SettingsPrefs(androidContext()) }
+    viewModel { SettingsViewModel(get(), get()) }
 
     // ── Inbox ─────────────────────────────────────────────────────────────────
     viewModel { InboxViewModel(get()) }

@@ -27,21 +27,26 @@ class MailRepository(
 
     fun observeInbox(): Flow<List<ThreadEntity>> = threadDao.observeInbox()
 
+    fun observeForLabel(labelId: String): Flow<List<ThreadEntity>> =
+        threadDao.observeForLabel("%$labelId%")
+
     fun observeMessages(threadId: String): Flow<List<MessageEntity>> =
         messageDao.observeForThread(threadId)
+
+    suspend fun getInboxIds(): List<String> = threadDao.getInboxIds()
+
+    suspend fun getThreadById(id: String): ThreadEntity? = threadDao.getById(id)
 
     // ── Sync inbox from API ───────────────────────────────────────────────────
 
     /**
-     * Fetch the latest inbox threads from the Gmail API and cache them in Room.
-     * Uses format=metadata (no body) so the sync is fast.
-     * Returns the nextPageToken if there are more pages.
+     * Fetch threads for the given label from the Gmail API and cache in Room.
+     * Uses format=metadata (fast, no body). Returns the nextPageToken if more pages exist.
      */
-    suspend fun syncInbox(pageToken: String? = null): String? {
-        val response = api.listThreads(labelId = "INBOX", pageToken = pageToken, maxResults = 50)
+    suspend fun syncSection(labelId: String, pageToken: String? = null): String? {
+        val response = api.listThreads(labelId = labelId, pageToken = pageToken, maxResults = 50)
         val summaries = response.threads ?: return null
 
-        // Fetch thread metadata in parallel (headers + labels, no body)
         val entities = coroutineScope {
             summaries.map { summary ->
                 async {
@@ -57,6 +62,9 @@ class MailRepository(
         threadDao.insertAll(entities)
         return response.nextPageToken
     }
+
+    /** Convenience wrapper used by SyncWorker. */
+    suspend fun syncInbox(pageToken: String? = null): String? = syncSection("INBOX", pageToken)
 
     // ── Load full thread (opens message bodies) ───────────────────────────────
 
@@ -118,11 +126,24 @@ class MailRepository(
 
     // ── Labels ────────────────────────────────────────────────────────────────
 
-    suspend fun syncLabels() {
+    private var lastLabelSyncMs = 0L
+
+    suspend fun syncLabels(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && lastLabelSyncMs > 0 && now - lastLabelSyncMs < LABEL_SYNC_THROTTLE_MS) return
         val response = api.listLabels()
-        val entities = response.labels?.map { LabelEntity(it.id, it.name, it.type ?: "") }
+        val entities = response.labels
+            ?.mapNotNull { dto ->
+                val name = dto.name ?: return@mapNotNull null
+                LabelEntity(dto.id, name, dto.type ?: "")
+            }
             ?: return
         labelDao.insertAll(entities)
+        lastLabelSyncMs = now
+    }
+
+    companion object {
+        private const val LABEL_SYNC_THROTTLE_MS = 60 * 60 * 1000L // 1 hour
     }
 
     suspend fun getLabels(): List<LabelEntity> = labelDao.getAll()

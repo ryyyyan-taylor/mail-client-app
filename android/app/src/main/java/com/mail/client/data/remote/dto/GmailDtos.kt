@@ -59,7 +59,7 @@ data class LabelListResponse(
 
 data class LabelDto(
     val id: String,
-    val name: String,
+    val name: String?,
     val type: String?,
 )
 

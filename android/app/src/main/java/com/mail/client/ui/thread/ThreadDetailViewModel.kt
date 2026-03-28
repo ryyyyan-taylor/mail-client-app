@@ -2,6 +2,7 @@ package com.mail.client.ui.thread
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mail.client.data.local.LabelEntity
 import com.mail.client.data.local.MessageEntity
 import com.mail.client.data.repository.MailRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -17,6 +18,9 @@ data class ThreadDetailUiState(
     val messages: List<MessageEntity> = emptyList(),
     val isLoading: Boolean = true,
     val error: String? = null,
+    val isRead: Boolean = true,
+    val availableLabels: List<LabelEntity> = emptyList(),
+    val navigateBack: Boolean = false,
 )
 
 class ThreadDetailViewModel(
@@ -49,7 +53,71 @@ class ThreadDetailViewModel(
                 _uiState.update { it.copy(isLoading = false) }
             }
         }
+
+        loadLabels()
     }
 
     fun clearError() = _uiState.update { it.copy(error = null) }
+
+    // ── Thread actions ─────────────────────────────────────────────────────────
+
+    fun delete() {
+        viewModelScope.launch {
+            try {
+                mailRepository.trashThread(threadId)
+                _uiState.update { it.copy(navigateBack = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to delete") }
+            }
+        }
+    }
+
+    fun spam() {
+        viewModelScope.launch {
+            try {
+                mailRepository.spamThread(threadId)
+                _uiState.update { it.copy(navigateBack = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to mark as spam") }
+            }
+        }
+    }
+
+    fun toggleRead() {
+        val currentlyRead = _uiState.value.isRead
+        _uiState.update { it.copy(isRead = !currentlyRead) }
+        viewModelScope.launch {
+            try {
+                if (currentlyRead) mailRepository.markUnread(threadId)
+                else mailRepository.markRead(threadId)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isRead = currentlyRead, error = "Failed to update read state") }
+            }
+        }
+    }
+
+    fun moveToLabel(labelId: String) {
+        viewModelScope.launch {
+            try {
+                mailRepository.moveThread(
+                    threadId = threadId,
+                    addLabels = listOf(labelId),
+                    removeLabels = listOf("INBOX"),
+                )
+                _uiState.update { it.copy(navigateBack = true) }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(error = "Failed to move thread") }
+            }
+        }
+    }
+
+    // ── Private ────────────────────────────────────────────────────────────────
+
+    private fun loadLabels() {
+        viewModelScope.launch {
+            try { mailRepository.syncLabels() } catch (_: Exception) { }
+            val labels = mailRepository.getLabels()
+            _uiState.update { it.copy(availableLabels = labels) }
+        }
+    }
 }

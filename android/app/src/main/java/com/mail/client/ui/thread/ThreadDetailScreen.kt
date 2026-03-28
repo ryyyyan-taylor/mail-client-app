@@ -8,6 +8,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -18,20 +20,32 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MenuDefaults
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -44,11 +58,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.mail.client.data.local.LabelEntity
 import com.mail.client.data.local.MessageEntity
 import com.mail.client.ui.theme.Accent
 import com.mail.client.ui.theme.Black
@@ -67,10 +83,16 @@ import org.koin.core.parameter.parametersOf
 fun ThreadDetailScreen(
     threadId: String,
     onBack: () -> Unit,
+    contentOnly: Boolean = false,
     viewModel: ThreadDetailViewModel = koinViewModel(key = threadId, parameters = { parametersOf(threadId) }),
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showMoveSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.navigateBack) {
+        if (uiState.navigateBack) onBack()
+    }
 
     LaunchedEffect(uiState.error) {
         if (uiState.error != null) {
@@ -79,68 +101,312 @@ fun ThreadDetailScreen(
         }
     }
 
-    Scaffold(
-        containerColor = Black,
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextSecondary,
-                        )
+    if (showMoveSheet) {
+        LabelPickerSheet(
+            labels = uiState.availableLabels,
+            onDismiss = { showMoveSheet = false },
+            onLabelSelected = { label ->
+                showMoveSheet = false
+                viewModel.moveToLabel(label.id)
+            },
+        )
+    }
+
+    if (contentOnly) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Black),
+        ) {
+            when {
+                uiState.isLoading && uiState.messages.isEmpty() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(color = Accent)
                     }
-                },
-                title = {
-                    Text(
-                        text = uiState.subject,
-                        color = TextPrimary,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Normal,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Black,
-                    scrolledContainerColor = SurfaceDark,
-                ),
-            )
-        },
-    ) { paddingValues ->
-        when {
-            uiState.isLoading && uiState.messages.isEmpty() -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator(color = Accent)
+                }
+                else -> {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        itemsIndexed(
+                            items = uiState.messages,
+                            key = { _, msg -> msg.id },
+                        ) { index, message ->
+                            val isLast = index == uiState.messages.lastIndex
+                            MessageCard(message = message, initiallyExpanded = isLast)
+                            HorizontalDivider(color = Divider, thickness = 0.5.dp)
+                        }
+                    }
                 }
             }
 
-            else -> {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                ) {
-                    itemsIndexed(
-                        items = uiState.messages,
-                        key = { _, msg -> msg.id },
-                    ) { index, message ->
-                        val isLast = index == uiState.messages.lastIndex
-                        MessageCard(message = message, initiallyExpanded = isLast)
-                        HorizontalDivider(color = Divider, thickness = 0.5.dp)
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .navigationBarsPadding(),
+            )
+
+            AnimatedVisibility(
+                visible = !uiState.isLoading || uiState.messages.isNotEmpty(),
+                enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 3 },
+                exit = fadeOut(tween(160)),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(16.dp),
+            ) {
+                ThreadActionsPill(
+                    isRead = uiState.isRead,
+                    onMove = { showMoveSheet = true },
+                    onDelete = { viewModel.delete() },
+                    onSpam = { viewModel.spam() },
+                    onToggleRead = { viewModel.toggleRead() },
+                )
+            }
+        }
+    } else {
+        Scaffold(
+            containerColor = Black,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            topBar = {
+                TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextSecondary,
+                            )
+                        }
+                    },
+                    title = {
+                        Text(
+                            text = uiState.subject,
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Normal,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Black,
+                        scrolledContainerColor = SurfaceDark,
+                    ),
+                )
+            },
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+            ) {
+                when {
+                    uiState.isLoading && uiState.messages.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(color = Accent)
+                        }
                     }
+
+                    else -> {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            itemsIndexed(
+                                items = uiState.messages,
+                                key = { _, msg -> msg.id },
+                            ) { index, message ->
+                                val isLast = index == uiState.messages.lastIndex
+                                MessageCard(message = message, initiallyExpanded = isLast)
+                                HorizontalDivider(color = Divider, thickness = 0.5.dp)
+                            }
+                        }
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !uiState.isLoading || uiState.messages.isNotEmpty(),
+                    enter = fadeIn(tween(220)) + slideInVertically(tween(220)) { it / 3 },
+                    exit = fadeOut(tween(160)),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(16.dp),
+                ) {
+                    ThreadActionsPill(
+                        isRead = uiState.isRead,
+                        onMove = { showMoveSheet = true },
+                        onDelete = { viewModel.delete() },
+                        onSpam = { viewModel.spam() },
+                        onToggleRead = { viewModel.toggleRead() },
+                    )
                 }
             }
         }
     }
 }
+
+// ── Thread actions pill ───────────────────────────────────────────────────────
+
+@Composable
+private fun ThreadActionsPill(
+    isRead: Boolean,
+    onMove: () -> Unit,
+    onDelete: () -> Unit,
+    onSpam: () -> Unit,
+    onToggleRead: () -> Unit,
+) {
+    var showOverflow by remember { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = SurfaceDark,
+        shadowElevation = 8.dp,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            PillIconButton(
+                icon = Icons.AutoMirrored.Filled.Label,
+                description = "Move to label",
+                onClick = onMove,
+            )
+            HorizontalDivider(
+                color = Divider,
+                thickness = 0.5.dp,
+                modifier = Modifier.width(24.dp),
+            )
+            PillIconButton(
+                icon = Icons.Default.Delete,
+                description = "Delete",
+                onClick = onDelete,
+            )
+            HorizontalDivider(
+                color = Divider,
+                thickness = 0.5.dp,
+                modifier = Modifier.width(24.dp),
+            )
+            Box {
+                PillIconButton(
+                    icon = Icons.Default.MoreVert,
+                    description = "More",
+                    onClick = { showOverflow = true },
+                )
+                DropdownMenu(
+                    expanded = showOverflow,
+                    onDismissRequest = { showOverflow = false },
+                    containerColor = SurfaceDark,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Mark as spam", color = TextPrimary, fontSize = 14.sp) },
+                        onClick = { showOverflow = false; onSpam() },
+                        colors = MenuDefaults.itemColors(textColor = TextPrimary),
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (isRead) "Mark as unread" else "Mark as read",
+                                color = TextPrimary,
+                                fontSize = 14.sp,
+                            )
+                        },
+                        onClick = { showOverflow = false; onToggleRead() },
+                        colors = MenuDefaults.itemColors(textColor = TextPrimary),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PillIconButton(
+    icon: ImageVector,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = TextSecondary,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+// ── Label picker bottom sheet ─────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LabelPickerSheet(
+    labels: List<LabelEntity>,
+    onDismiss: () -> Unit,
+    onLabelSelected: (LabelEntity) -> Unit,
+) {
+    val userLabels = remember(labels) { labels.filter { it.type != "system" }.sortedBy { it.name.lowercase() } }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = SurfaceDark,
+        dragHandle = null,
+    ) {
+        Text(
+            text = "Move to label",
+            color = TextPrimary,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(top = 20.dp, bottom = 4.dp),
+        )
+
+        if (userLabels.isEmpty()) {
+            Text(
+                text = "No labels found. Create labels in Gmail to use this feature.",
+                color = TextSecondary,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            )
+        } else {
+            LazyColumn(modifier = Modifier.navigationBarsPadding()) {
+                items(userLabels, key = { it.id }) { label ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onLabelSelected(label) }
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Label,
+                            contentDescription = null,
+                            tint = Accent,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(
+                            text = label.name,
+                            color = TextPrimary,
+                            fontSize = 14.sp,
+                        )
+                    }
+                    HorizontalDivider(color = Divider, thickness = 0.5.dp)
+                }
+            }
+        }
+    }
+}
+
+// ── Message card ──────────────────────────────────────────────────────────────
 
 @Composable
 private fun MessageCard(message: MessageEntity, initiallyExpanded: Boolean) {
@@ -209,10 +475,10 @@ private fun MessageCard(message: MessageEntity, initiallyExpanded: Boolean) {
     }
 }
 
+// ── WebView body ──────────────────────────────────────────────────────────────
+
 @Composable
 private fun HtmlBody(html: String, modifier: Modifier = Modifier) {
-    // CSS pixels (from JS scrollHeight) equal dp when the viewport is width=device-width.
-    // Do NOT convert with density — that would divide by e.g. 2.75 and make the view too small.
     val heightDp = remember { mutableStateOf(1.dp) }
 
     AndroidView(
@@ -225,9 +491,6 @@ private fun HtmlBody(html: String, modifier: Modifier = Modifier) {
                 isScrollContainer = false
                 overScrollMode = WebView.OVER_SCROLL_NEVER
 
-                // WebView steals the gesture on ACTION_DOWN via requestDisallowInterceptTouchEvent(true).
-                // Resetting it on ACTION_MOVE lets LazyColumn reclaim vertical scrolls.
-                // ACTION_DOWN is untouched so link taps still fire.
                 setOnTouchListener { v, event ->
                     if (event.action == MotionEvent.ACTION_MOVE) {
                         v.parent?.requestDisallowInterceptTouchEvent(false)
@@ -237,7 +500,6 @@ private fun HtmlBody(html: String, modifier: Modifier = Modifier) {
 
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String) {
-                        // post() waits for the layout pass so scrollHeight is accurate.
                         view.post {
                             view.evaluateJavascript("""
                                 (function() {
@@ -262,7 +524,6 @@ private fun HtmlBody(html: String, modifier: Modifier = Modifier) {
             }
         },
         update = { webView ->
-            // Only reload when HTML actually changes, not on every recomposition.
             if (webView.tag != html) {
                 webView.tag = html
                 webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
@@ -274,7 +535,6 @@ private fun HtmlBody(html: String, modifier: Modifier = Modifier) {
 
 // ── HTML builder ──────────────────────────────────────────────────────────────
 
-// HTML emails get a white background — that's what virtually all email templates expect.
 private val CSS_HTML = """
 <style>
 * {
@@ -308,7 +568,6 @@ pre, code {
 </style>
 """.trimIndent()
 
-// Plain text stays dark — it's rendered in our own chrome, not the email's.
 private val CSS_PLAIN = """
 <style>
 * { box-sizing: border-box; }
@@ -335,8 +594,6 @@ private val STYLE_BLOCK_RE = Regex("(?is)<style[^>]*>.*?</style>")
 private val HEAD_RE        = Regex("(?is)<head[^>]*>.*?</head>")
 
 private fun buildHtml(body: String): String {
-    // Preserve <style> blocks from the original <head> — they contain responsive
-    // @media queries that reformat the email layout for narrow screens.
     val emailStyles = HEAD_RE.find(body)?.let { head ->
         STYLE_BLOCK_RE.findAll(head.value).joinToString("\n") { it.value }
     } ?: ""
@@ -353,7 +610,6 @@ private fun buildHtml(body: String): String {
     val isHtml = stripped.contains(Regex("<[a-zA-Z]"))
 
     val (css, content) = if (isHtml) {
-        // Our base CSS first, then the email's own styles so its @media rules win.
         "$CSS_HTML\n$emailStyles" to stripped
     } else {
         val escaped = stripped
