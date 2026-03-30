@@ -163,6 +163,43 @@ Compose Navigation — the current approach is sufficient for the screen count.
   Eliminates white flash before Compose renders.
 - Next: real device testing, then iterate on features from plan.md.
 
+### 2026-03-28 (session 3)
+- Real device testing via debug APK (`./gradlew assembleDebug`). SHA-1 already registered
+  in Google Cloud Console for the debug keystore.
+- Text size bump across the board (+1sp each role in `ui/theme/Type.kt`):
+  - bodyLarge 15→16sp, bodyMedium 13→14sp, bodySmall 12→13sp, titleMedium 15→16sp, labelSmall 11→12sp
+  - Inbox row hardcoded sizes also bumped: sender/subject 13→14sp, timestamp 12→13sp (`InboxScreen.kt`).
+- Pill/button touch targets brought to M3 spec (48×48dp minimum):
+  - `ThreadDetailScreen.kt` `PillIconButton`: 40→48dp, icon 18→20dp.
+  - `InboxScreen.kt` `PillIconButton` (selection pill): icon 18→20dp (was already 48dp).
+- Back navigation fixed (`MainActivity.kt`): `BackHandler(enabled = screen is NavScreen.Thread)`
+  clears `openThreadId` → returns to Inbox. Back from Inbox exits app. Landscape unaffected
+  (NavScreen.Thread is never set in landscape).
+- Next: continue real device testing, then pick next feature from plan.md backlog.
+
+### 2026-03-29
+- Notification action button: tapping "Delete" on a notification trashes the thread and
+  dismisses the notification without opening the app.
+  - New `NotificationActionReceiver` (`worker/NotificationActionReceiver.kt`): `BroadcastReceiver`
+    + `KoinComponent`, cancels notification immediately then calls `mailRepository.trashThread()`
+    via `goAsync()` + coroutine.
+  - Registered in `AndroidManifest.xml` with `exported="false"`.
+  - `SyncWorker.notifyNewThread()`: added Delete `PendingIntent` (broadcast), request code
+    `notificationId xor Int.MIN_VALUE` to avoid collision with tap intent.
+  - New `res/drawable/ic_notification_email.xml`: white monochrome envelope vector drawable,
+    replaces `android.R.drawable.ic_dialog_email` as the notification small icon.
+- Pill icon order changed to **More → Label → Delete** in both pills (trash at trailing edge).
+  - `InboxScreen.kt` (selection pill, horizontal): More Box moved before Label, Delete stays last.
+  - `ThreadDetailScreen.kt` (actions pill, vertical): More Box moved to top, Label + divider
+    inserted between More and Delete, Delete stays at bottom.
+- Thread load performance fixes:
+  - `MessageDao.replaceForThread()`: new `@Transaction` method wraps `deleteForThread` +
+    `insertAll` atomically. Room's Flow no longer emits an intermediate empty list, eliminating
+    the spinner flash on revisit.
+  - `MailRepository.loadFullThread()`: uses `replaceForThread` instead of separate delete+insert.
+  - `ThreadDetailViewModel`: `loadFullThread` and `markRead` now run in parallel via
+    `coroutineScope { async { } + async { } }`, saving one full API round-trip off load time.
+
 ---
 
 ## How to Update This File

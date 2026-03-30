@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.mail.client.MainActivity
+import com.mail.client.R
 import com.mail.client.data.local.SettingsPrefs
 import com.mail.client.data.repository.AuthRepository
 import com.mail.client.data.repository.MailRepository
@@ -63,26 +64,46 @@ class SyncWorker(
             ) != PackageManager.PERMISSION_GRANTED
         ) return
 
+        val notificationId = id.hashCode()
+
         val tapIntent = Intent(applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(MainActivity.EXTRA_THREAD_ID, id)
         }
-        val pendingIntent = PendingIntent.getActivity(
+        val tapPendingIntent = PendingIntent.getActivity(
             applicationContext,
-            id.hashCode(),
+            notificationId,
             tapIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 
+        val trashIntent = Intent(applicationContext, NotificationActionReceiver::class.java).apply {
+            action = ACTION_TRASH_THREAD
+            putExtra(MainActivity.EXTRA_THREAD_ID, id)
+            putExtra(EXTRA_NOTIFICATION_ID, notificationId)
+        }
+        val trashPendingIntent = PendingIntent.getBroadcast(
+            applicationContext,
+            // Use a different request code from the tap intent to avoid collisions
+            notificationId xor Int.MIN_VALUE,
+            trashIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
         val notification = NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setSmallIcon(R.drawable.ic_notification_email)
             .setContentTitle(sender)
             .setContentText(subject)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(tapPendingIntent)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .addAction(
+                android.R.drawable.ic_menu_delete,
+                "Delete",
+                trashPendingIntent,
+            )
             .build()
 
-        NotificationManagerCompat.from(applicationContext).notify(id.hashCode(), notification)
+        NotificationManagerCompat.from(applicationContext).notify(notificationId, notification)
     }
 }

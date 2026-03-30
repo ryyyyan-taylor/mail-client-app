@@ -267,26 +267,6 @@ private fun ThreadActionsPill(
         shadowElevation = 8.dp,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            PillIconButton(
-                icon = Icons.AutoMirrored.Filled.Label,
-                description = "Move to label",
-                onClick = onMove,
-            )
-            HorizontalDivider(
-                color = Divider,
-                thickness = 0.5.dp,
-                modifier = Modifier.width(24.dp),
-            )
-            PillIconButton(
-                icon = Icons.Default.Delete,
-                description = "Delete",
-                onClick = onDelete,
-            )
-            HorizontalDivider(
-                color = Divider,
-                thickness = 0.5.dp,
-                modifier = Modifier.width(24.dp),
-            )
             Box {
                 PillIconButton(
                     icon = Icons.Default.MoreVert,
@@ -316,6 +296,26 @@ private fun ThreadActionsPill(
                     )
                 }
             }
+            HorizontalDivider(
+                color = Divider,
+                thickness = 0.5.dp,
+                modifier = Modifier.width(24.dp),
+            )
+            PillIconButton(
+                icon = Icons.AutoMirrored.Filled.Label,
+                description = "Move to label",
+                onClick = onMove,
+            )
+            HorizontalDivider(
+                color = Divider,
+                thickness = 0.5.dp,
+                modifier = Modifier.width(24.dp),
+            )
+            PillIconButton(
+                icon = Icons.Default.Delete,
+                description = "Delete",
+                onClick = onDelete,
+            )
         }
     }
 }
@@ -328,7 +328,7 @@ private fun PillIconButton(
 ) {
     Box(
         modifier = Modifier
-            .size(40.dp)
+            .size(48.dp)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -336,7 +336,7 @@ private fun PillIconButton(
             imageVector = icon,
             contentDescription = description,
             tint = TextSecondary,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(20.dp),
         )
     }
 }

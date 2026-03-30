@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.mail.client.data.local.LabelEntity
 import com.mail.client.data.local.MessageEntity
 import com.mail.client.data.repository.MailRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,8 +47,11 @@ class ThreadDetailViewModel(
 
         viewModelScope.launch {
             try {
-                mailRepository.loadFullThread(threadId)
-                mailRepository.markRead(threadId)
+                // Load body and mark-read are independent — run in parallel
+                coroutineScope {
+                    async { mailRepository.loadFullThread(threadId) }
+                    async { mailRepository.markRead(threadId) }
+                }
             } catch (e: Exception) {
                 _uiState.update { it.copy(error = e.message ?: "Failed to load thread") }
             } finally {

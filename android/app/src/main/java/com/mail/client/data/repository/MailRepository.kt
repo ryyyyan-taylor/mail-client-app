@@ -78,10 +78,10 @@ class MailRepository(
         // Update the thread entity with the fresh data
         threadDao.insertAll(listOf(detail.toThreadEntity()))
 
-        // Replace all cached messages for this thread
+        // Replace messages atomically — @Transaction prevents the Flow from emitting
+        // an intermediate empty state, which would briefly re-show the spinner on revisit.
         val messages = detail.messages?.map { it.toMessageEntity() } ?: emptyList()
-        messageDao.deleteForThread(threadId)
-        messageDao.insertAll(messages)
+        messageDao.replaceForThread(threadId, messages)
     }
 
     // ── Thread actions ────────────────────────────────────────────────────────

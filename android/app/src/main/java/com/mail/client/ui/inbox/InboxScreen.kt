@@ -510,8 +510,6 @@ private fun SelectionPill(
                 fontSize = 13.sp,
                 modifier = Modifier.padding(end = 8.dp),
             )
-            PillIconButton(icon = Icons.AutoMirrored.Filled.Label, description = "Move to label", onClick = onMoveRequest)
-            PillIconButton(icon = Icons.Default.Delete, description = "Delete", onClick = onDelete)
             Box {
                 PillIconButton(icon = Icons.Default.MoreVert, description = "More", onClick = { showOverflow = true })
                 DropdownMenu(
@@ -536,6 +534,8 @@ private fun SelectionPill(
                     )
                 }
             }
+            PillIconButton(icon = Icons.AutoMirrored.Filled.Label, description = "Move to label", onClick = onMoveRequest)
+            PillIconButton(icon = Icons.Default.Delete, description = "Delete", onClick = onDelete)
         }
     }
 }
@@ -546,7 +546,7 @@ private fun PillIconButton(icon: ImageVector, description: String, onClick: () -
         modifier = Modifier.size(48.dp).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(imageVector = icon, contentDescription = description, tint = TextSecondary, modifier = Modifier.size(18.dp))
+        Icon(imageVector = icon, contentDescription = description, tint = TextSecondary, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -767,7 +767,7 @@ fun ThreadListItem(
         Text(
             text = EmailParser.displayName(thread.from).ifEmpty { "?" },
             color = if (isRead) TextSecondary else TextPrimary,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = if (isRead) FontWeight.Normal else FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -779,7 +779,7 @@ fun ThreadListItem(
         Text(
             text = thread.subject,
             color = if (isRead) TextSecondary else TextPrimary,
-            fontSize = 13.sp,
+            fontSize = 14.sp,
             fontWeight = if (isRead) FontWeight.Normal else FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -788,6 +788,6 @@ fun ThreadListItem(
 
         Spacer(modifier = Modifier.width(8.dp))
 
-        Text(text = TimeFormatter.format(thread.lastMessageTimestamp), color = TextSecondary, fontSize = 12.sp, maxLines = 1)
+        Text(text = TimeFormatter.format(thread.lastMessageTimestamp), color = TextSecondary, fontSize = 13.sp, maxLines = 1)
     }
 }
