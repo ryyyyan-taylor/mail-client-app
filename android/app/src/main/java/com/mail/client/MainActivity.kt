@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -105,6 +106,10 @@ class MainActivity : ComponentActivity() {
                     !isSignedIn -> NavScreen.Auth
                     openThreadId != null && !isLandscape -> NavScreen.Thread(openThreadId!!)
                     else -> NavScreen.Inbox
+                }
+
+                BackHandler(enabled = screen is NavScreen.Thread) {
+                    openThreadId = null
                 }
 
                 AnimatedContent(

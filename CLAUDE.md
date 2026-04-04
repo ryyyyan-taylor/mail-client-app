@@ -131,86 +131,15 @@ Compose Navigation — the current approach is sufficient for the screen count.
 
 ## Session Notes
 
-### 2026-03-28
-- MVP complete. All 8 sections shipped.
-- Settings (SettingsSheet + SettingsViewModel), splash screen, SyncWorker auth/pref
-  guards, syncLabels throttle, visual bug fixes (CircularProgressIndicator modifier,
-  SelectionPill padding, ThreadActionsPill AnimatedVisibility).
-- Moved Settings out of top bar into MoreVert overflow; removed redundant refresh icon
-  (pull-to-refresh covers it).
-
-### 2026-03-28 (session 2)
-- Landscape two-pane layout: persistent 50/50 split with scroll-hiding top bar.
-  - `LocalConfiguration.current.orientation` detection in both `InboxScreen` and `MainActivity`.
-  - `TopAppBarDefaults.enterAlwaysScrollBehavior()` + `nestedScroll` in landscape only.
-  - `InboxListContent` private composable extracted so list renders in both orientations.
-  - Right pane: `key(selectedThreadId) { ThreadDetailScreen(contentOnly=true) }` or
-    "select a thread" placeholder.
-  - `contentOnly: Boolean = false` param on `ThreadDetailScreen` — skips Scaffold/TopAppBar,
-    renders `Box(Black)` with SnackbarHost at BottomStart + action pill at BottomEnd.
-  - `initialSelectedThreadId: String?` param on `InboxScreen` + `LaunchedEffect` sync
-    so notification taps route correctly in landscape without going through `NavScreen.Thread`.
-  - `MainActivity`: `openThreadId != null && !isLandscape` guards `NavScreen.Thread`;
-    landscape passes `initialSelectedThreadId = openThreadId` to `InboxScreen` instead.
-- Section/label navigation: tap inbox title → bottom sheet (system sections + user labels).
-  - Fixed filter bug: `it.type != "system"` (was `== "user"`, dropped blank-type labels).
-  - Fixed scroll bug: SectionPickerSheet uses `LazyColumn` (was `Column`).
-  - Fixed Moshi crash: `LabelDto.name: String?` (was non-nullable, threw on labels
-    without `name` field, silently swallowed, stale cache used).
-  - Fixed throttle: `syncLabels(force=true)` called via `refreshLabels()` when picker opens.
-- Dark splash screen: `themes.xml` switched from `Theme.Material.Light.NoActionBar` to
-  `Theme.Material.NoActionBar` with `windowBackground/statusBarColor/navigationBarColor = #000`.
-  Eliminates white flash before Compose renders.
-- Next: real device testing, then iterate on features from plan.md.
-
-### 2026-03-28 (session 3)
-- Real device testing via debug APK (`./gradlew assembleDebug`). SHA-1 already registered
-  in Google Cloud Console for the debug keystore.
-- Text size bump across the board (+1sp each role in `ui/theme/Type.kt`):
-  - bodyLarge 15→16sp, bodyMedium 13→14sp, bodySmall 12→13sp, titleMedium 15→16sp, labelSmall 11→12sp
-  - Inbox row hardcoded sizes also bumped: sender/subject 13→14sp, timestamp 12→13sp (`InboxScreen.kt`).
-- Pill/button touch targets brought to M3 spec (48×48dp minimum):
-  - `ThreadDetailScreen.kt` `PillIconButton`: 40→48dp, icon 18→20dp.
-  - `InboxScreen.kt` `PillIconButton` (selection pill): icon 18→20dp (was already 48dp).
-- Back navigation fixed (`MainActivity.kt`): `BackHandler(enabled = screen is NavScreen.Thread)`
-  clears `openThreadId` → returns to Inbox. Back from Inbox exits app. Landscape unaffected
-  (NavScreen.Thread is never set in landscape).
-- Next: continue real device testing, then pick next feature from plan.md backlog.
-
-### 2026-03-29
-- Notification action button: tapping "Delete" on a notification trashes the thread and
-  dismisses the notification without opening the app.
-  - New `NotificationActionReceiver` (`worker/NotificationActionReceiver.kt`): `BroadcastReceiver`
-    + `KoinComponent`, cancels notification immediately then calls `mailRepository.trashThread()`
-    via `goAsync()` + coroutine.
-  - Registered in `AndroidManifest.xml` with `exported="false"`.
-  - `SyncWorker.notifyNewThread()`: added Delete `PendingIntent` (broadcast), request code
-    `notificationId xor Int.MIN_VALUE` to avoid collision with tap intent.
-  - New `res/drawable/ic_notification_email.xml`: white monochrome envelope vector drawable,
-    replaces `android.R.drawable.ic_dialog_email` as the notification small icon.
-- Pill icon order changed to **More → Label → Delete** in both pills (trash at trailing edge).
-  - `InboxScreen.kt` (selection pill, horizontal): More Box moved before Label, Delete stays last.
-  - `ThreadDetailScreen.kt` (actions pill, vertical): More Box moved to top, Label + divider
-    inserted between More and Delete, Delete stays at bottom.
-- Thread load performance fixes:
-  - `MessageDao.replaceForThread()`: new `@Transaction` method wraps `deleteForThread` +
-    `insertAll` atomically. Room's Flow no longer emits an intermediate empty list, eliminating
-    the spinner flash on revisit.
-  - `MailRepository.loadFullThread()`: uses `replaceForThread` instead of separate delete+insert.
-  - `ThreadDetailViewModel`: `loadFullThread` and `markRead` now run in parallel via
-    `coroutineScope { async { } + async { } }`, saving one full API round-trip off load time.
+Full session history is in `CLAUDE-sessions.md` (not auto-loaded — read it only when
+history context is needed). Append new entries there, not here.
 
 ---
 
-## How to Update This File
+## How to Update
 
-At the end of every session, append a new entry under **Session Notes** with:
-- Date
-- What was completed or changed (be specific — file names, bugs fixed, decisions made)
-- Any new constraints or gotchas discovered
-- What comes next
-
-Also update `plan.md` (tick off completed items, add new feature ideas as they come up).
-
-Update global memory files in `/home/rt/.claude/projects/-home-rt-Code-mail-client-app/memory/`
-if anything changes about the user's preferences, project goals, or key decisions.
+- **Session notes:** Append to `CLAUDE-sessions.md` (not this file).
+- **Lasting decisions/gotchas only** in this file under Key Implementation Notes.
+- Update `plan.md` (tick completed items, add new feature ideas).
+- Update memory files in `/home/rt/.claude/projects/-home-rt-Code-mail-client-app/memory/`
+  if user preferences or project goals change.

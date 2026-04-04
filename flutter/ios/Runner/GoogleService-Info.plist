@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!--
+    TODO(ios): Replace this placeholder with the real GoogleService-Info.plist downloaded
+    from Google Cloud Console when iOS work begins.
+
+    Steps:
+      1. Go to console.cloud.google.com → your project → OAuth 2.0 Credentials
+      2. Create an iOS OAuth client (type: iOS, Bundle ID: com.mail.client)
+      3. Download the generated GoogleService-Info.plist and replace this file
+      4. Add the REVERSED_CLIENT_ID from the plist as a URL scheme in ios/Runner/Info.plist
+         under CFBundleURLSchemes so that the Google Sign-In redirect works.
+  -->
+  <key>PLACEHOLDER</key>
+  <string>true</string>
+</dict>
+</plist>
